@@ -206,6 +206,12 @@ struct NSigTests {
             let calculatedN = try #require(response.nMap[pair.input])
             #expect(calculatedN == pair.output)
         }
+        // a fresh solver for the same player solves from the cached preprocessed player
+        let again = try SignatureSolver(js: js).batchSolve(request: SignatureSolver.SolveRequest(nInputs: inputs, sigInputs: []))
+        for pair in request.pairs {
+            let calculatedN = try #require(again.nMap[pair.input])
+            #expect(calculatedN == pair.output)
+        }
     }
     
 }

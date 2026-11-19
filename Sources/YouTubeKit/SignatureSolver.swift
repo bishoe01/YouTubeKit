@@ -14,6 +14,41 @@ class SignatureSolver {
 
     private static let log = OSLog(SignatureSolver.self)
 
+    // MARK: Preprocessed player cache
+    // Parsing the ~2 MB player with meriyah dominates a solve, and it used to run
+    // once per client response. Only the preprocessed player text is kept, not the
+    // JSContext: a live context holds hundreds of MB that a fresh one gives back.
+    private static let cacheLock = NSLock()
+#if swift(>=5.10)
+    nonisolated(unsafe) private static var preprocessedPlayers: [(js: String, preprocessed: String)] = []
+#else
+    private static var preprocessedPlayers: [(js: String, preprocessed: String)] = []
+#endif
+    /// A session rarely sees more than a couple of player variants.
+    private static let maxCachedPlayers = 4
+
+    private static func cachedPreprocessed(forJS js: String) -> String? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return preprocessedPlayers.first(where: { $0.js == js })?.preprocessed
+    }
+
+    private static func storePreprocessed(_ preprocessed: String, forJS js: String) {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        preprocessedPlayers.removeAll { $0.js == js }
+        preprocessedPlayers.insert((js, preprocessed), at: 0)
+        if preprocessedPlayers.count > maxCachedPlayers {
+            preprocessedPlayers.removeLast()
+        }
+    }
+
+    private static func discardPreprocessed(forJS js: String) {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        preprocessedPlayers.removeAll { $0.js == js }
+    }
+
     private let vm = JSVirtualMachine()
     private let ctx: JSContext
     
@@ -154,14 +189,29 @@ class SignatureSolver {
             Request(type: .sig, challenges: request.sigInputs)
         ]
 
+        let preprocessed = Self.cachedPreprocessed(forJS: playerJS)
         let input = Input(
-            type: .player,
-            player: self.playerJS,
-            preprocessed_player: nil,
+            type: preprocessed == nil ? .player : .preprocessedPlayer,
+            player: preprocessed == nil ? playerJS : nil,
+            preprocessed_player: preprocessed,
             requests: requests,
-            output_preprocessed: false
+            output_preprocessed: preprocessed == nil
         )
 
+        do {
+            let solved = try solveMaps(input: input, requests: requests)
+            if preprocessed == nil, let output = solved.preprocessed {
+                Self.storePreprocessed(output, forJS: playerJS)
+            }
+            return solved.response
+        } catch {
+            // the stale-JS retry should start from a full parse, not this cache entry
+            Self.discardPreprocessed(forJS: playerJS)
+            throw error
+        }
+    }
+
+    private func solveMaps(input: Input, requests: [Request]) throws -> (response: SolveResponse, preprocessed: String?) {
         let response = try solve(with: input)
 
         var nMap: [String: String] = [:]
@@ -186,7 +236,7 @@ class SignatureSolver {
             }
         }
 
-        return SolveResponse(nMap: nMap, sigMap: sigMap)
+        return (SolveResponse(nMap: nMap, sigMap: sigMap), response.preprocessed_player)
     }
 }
 #endif

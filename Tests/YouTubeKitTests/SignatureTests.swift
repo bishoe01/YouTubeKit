@@ -143,6 +143,12 @@ struct SignatureTests {
             let calculatedSignature = try #require(response.sigMap[pair.input])
             #expect(calculatedSignature == pair.output)
         }
+        // a fresh solver for the same player solves from the cached preprocessed player
+        let again = try SignatureSolver(js: js).batchSolve(request: SignatureSolver.SolveRequest(nInputs: [], sigInputs: inputs))
+        for pair in request.pairs {
+            let calculatedSignature = try #require(again.sigMap[pair.input])
+            #expect(calculatedSignature == pair.output)
+        }
     }
 
 }
