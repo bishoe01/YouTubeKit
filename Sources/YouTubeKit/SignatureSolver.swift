@@ -57,6 +57,14 @@ class SignatureSolver {
         return solver
     }
 
+    /// Drops a cached solver whose solve failed, so the stale-JS retry starts
+    /// from a fresh context and a full player parse instead of reusing it.
+    static func discardShared(_ solver: SignatureSolver) {
+        sharedLock.lock()
+        defer { sharedLock.unlock() }
+        sharedSolvers.removeAll { $0 === solver }
+    }
+
     /// Player preprocessed by the first solve; skips the full player parse afterwards
     private var preprocessedPlayer: String?
     /// JSContext isn't thread-safe; the shared instance serializes solves
@@ -170,6 +178,11 @@ class SignatureSolver {
         guard let out = result.toString() else {
             throw SignatureSolverError.resultConversionFailed
         }
+
+        // The context now outlives the solve, so free the parse garbage
+        // (hundreds of MB for a full player) instead of waiting for the GC.
+        ctx.setObject(nil, forKeyedSubscript: "swiftInput" as NSString)
+        JSGarbageCollect(ctx.jsGlobalContextRef)
         
         guard let data = out.data(using: .utf8) else {
             throw SignatureSolverError.encodingFailed

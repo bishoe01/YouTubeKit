@@ -443,7 +443,13 @@ class Extraction {
 
         // Batch solve all signatures and n-parameters
         let request = SignatureSolver.SolveRequest(nInputs: nInputs, sigInputs: sigInputs)
-        let response = try solver.batchSolve(request: request)
+        let response: SignatureSolver.SolveResponse
+        do {
+            response = try solver.batchSolve(request: request)
+        } catch {
+            SignatureSolver.discardShared(solver)
+            throw error
+        }
 
         var invalidStreamIndices = [Int]()
 
