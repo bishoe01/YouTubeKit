@@ -507,13 +507,28 @@ class Extraction {
     }
 #endif
     
-    /// Filter out all audio streams that are not original language (i.e. dubbed)
-    class func filterOutDubbedAudio(streamManifest: [InnerTube.StreamingData.Format]) -> [InnerTube.StreamingData.Format] {
-        streamManifest.filter { stream in
-            if let audioTrack = stream.audioTrack {
-                return audioTrack.displayName.lowercased().hasSuffix("original")
+    /// Drops dubbed audio streams and keeps unlabeled and original-language ones.
+    /// For an itag that also comes with stable volume or voice boost applied, keeps only the plain original.
+    @available(iOS 13.0, watchOS 6.0, tvOS 13.0, macOS 10.15, *)
+    class func filterOutDubbedAudio(_ streams: [Stream]) -> [Stream] {
+        let plainITags = Set(streams.filter { $0.audioContent == .original }.map(\.itag.itag))
+        return streams.filter { stream in
+            switch stream.audioContent {
+            case .unlabeled, .original:
+                return true
+            case .adjustedOriginal:
+                return !plainITags.contains(stream.itag.itag)
+            case .dubbed:
+                return false
             }
-            return true
+        }
+    }
+
+    /// Throws when dubbed audio was dropped and no audio-only stream is left, so a caller never falls back to a dub.
+    @available(iOS 13.0, watchOS 6.0, tvOS 13.0, macOS 10.15, *)
+    class func requireOriginalAudio(_ streams: [Stream], sawDubbedAudio: Bool) throws {
+        if sawDubbedAudio && !streams.contains(where: { $0.includesAudioTrack && !$0.includesVideoTrack }) {
+            throw YouTubeKitError.originalAudioMissing
         }
     }
     

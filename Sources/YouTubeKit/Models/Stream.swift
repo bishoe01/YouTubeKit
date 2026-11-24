@@ -139,3 +139,35 @@ public struct Stream: Sendable {
     }
     
 }
+
+@available(iOS 13.0, watchOS 6.0, tvOS 13.0, macOS 10.15, *)
+extension Stream {
+
+    /// Which audio a stream carries, read from `xtags` in its URL (`acont=original:drc=1:lang=ko`).
+    /// `audioTrack.displayName` can't tell, because YouTube translates it into the request language ("Korean original", "한국어 원본").
+    enum AudioContent: Equatable {
+        /// No `acont` tag, as in a video with a single audio track.
+        case unlabeled
+        case original
+        /// The original with stable volume (`drc=1`) or voice boost (`vb=1`) applied.
+        case adjustedOriginal
+        case dubbed
+    }
+
+    var audioContent: AudioContent {
+        let pairs = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first { $0.name == "xtags" }?.value?
+            .split(separator: ":")
+            .map { $0.split(separator: "=", maxSplits: 1) } ?? []
+        let tags = Dictionary(pairs.filter { $0.count == 2 }.map { ($0[0], $0[1]) }, uniquingKeysWith: { first, _ in first })
+        switch tags["acont"] {
+        case nil:
+            return .unlabeled
+        case "original":
+            return tags["drc"] == "1" || tags["vb"] == "1" ? .adjustedOriginal : .original
+        default:
+            return .dubbed
+        }
+    }
+
+}

@@ -243,6 +243,7 @@ public class YouTube {
                     
                     var streams = [Stream]()
                     var existingITags = Set<Int>()
+                    var sawDubbedAudio = false
                     
                     func process(streamingData: InnerTube.StreamingData, videoInfo: InnerTube.VideoInfo) async throws {
                         
@@ -259,10 +260,9 @@ public class YouTube {
                             try await Extraction.applySignature(streamManifest: &streamManifest, videoInfo: videoInfo, js: js)
                         }
                         
-                        // filter out dubbed audio tracks
-                        streamManifest = Extraction.filterOutDubbedAudio(streamManifest: streamManifest)
-                        
-                        let newStreams = streamManifest.compactMap { try? Stream(format: $0) }
+                        let allStreams = streamManifest.compactMap { try? Stream(format: $0) }
+                        sawDubbedAudio = sawDubbedAudio || allStreams.contains { $0.audioContent == .dubbed }
+                        let newStreams = Extraction.filterOutDubbedAudio(allStreams)
                         
                         // make sure only one stream per itag exists
                         for stream in newStreams {
@@ -284,6 +284,7 @@ public class YouTube {
                         }
                     }
                     
+                    try Extraction.requireOriginalAudio(streams, sawDubbedAudio: sawDubbedAudio)
                     return streams
 #endif
                     
@@ -291,7 +292,10 @@ public class YouTube {
                     let remoteClient = RemoteYouTubeClient(serverURL: serverURL)
                     let remoteStreams = try await remoteClient.extractStreams(forVideoID: videoID)
                     
-                    return remoteStreams.compactMap { try? Stream(remoteStream: $0) }
+                    let allStreams = remoteStreams.compactMap { try? Stream(remoteStream: $0) }
+                    let streams = Extraction.filterOutDubbedAudio(allStreams)
+                    try Extraction.requireOriginalAudio(streams, sawDubbedAudio: allStreams.contains { $0.audioContent == .dubbed })
+                    return streams
                 }
             }
             
