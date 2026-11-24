@@ -61,13 +61,13 @@ final class ExtractionTests: XCTestCase {
     func testJSURLUsesExtractedPlayerPath() throws {
         let html = #"ytcfg.set({"STS":20515});var ytInitialPlayerResponse = {};var ytplayer = {"config":{"assets":{"js":"/s/player/6c5cb4f4/player_ias.vflset/en_US/base.js"}}};"#
         let jsURL = try Extraction.jsURL(html: html)
-        XCTAssertEqual(jsURL, "https://youtube.com/s/player/6c5cb4f4/player_ias.vflset/en_US/base.js")
+        XCTAssertEqual(jsURL, "https://youtube.com/s/player/6c5cb4f4/tv-player-ias.vflset/tv-player-ias.js")
     }
 
-    func testJSURLUsesMainPlayerVariant() throws {
+    func testJSURLUsesTVPlayerVariant() throws {
         let html = #"ytcfg.set({"STS":20515});var ytInitialPlayerResponse = {};var ytplayer = {"config":{"assets":{"js":"/s/player/983e9c18/player_ias_tcl.vflset/en_US/base.js"}}};"#
         let jsURL = try Extraction.jsURL(html: html)
-        XCTAssertEqual(jsURL, "https://youtube.com/s/player/983e9c18/player_ias.vflset/en_US/base.js")
+        XCTAssertEqual(jsURL, "https://youtube.com/s/player/983e9c18/tv-player-ias.vflset/tv-player-ias.js")
     }
 
     func testSignatureTimestampUsesExtractedValue() throws {

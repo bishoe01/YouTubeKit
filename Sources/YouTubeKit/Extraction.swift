@@ -27,16 +27,17 @@ class Extraction {
     /// Allows to override player id in case we have a (currently) unsolvable in the future
     private static let PLAYER_ID_OVERRIDE: String? = nil
     private static let PLAYER_STS_OVERRIDE: Int? = nil
-    /// Variant path every player is fetched as, like yt-dlp's default `main` variant.
-    /// Other variants of the same player (e.g. `player_ias_tcl`) can be unsolvable.
-    private static let PLAYER_JS_VARIANT_PATH = "/player_ias.vflset/en_US/base.js"
+    /// Variant path every player is fetched as, like yt-dlp's default `tv` variant (yt-dlp/yt-dlp#18124).
+    /// Other variants of the same player can be unsolvable: `player_ias_tcl` of 983e9c18 has no solutions,
+    /// and the main `player_ias` of 05a4ffc0 throws in the solver (yt-dlp/ejs#79).
+    private static let PLAYER_JS_VARIANT_PATH = "/tv-player-ias.vflset/tv-player-ias.js"
 
     /// Get the base JavaScript url
     class func jsURL(html: String) throws -> String {
         let baseURL = try (try? getYTPlayerConfig(html: html).assets?.js)
                            ?? (try getYTPlayerJS(html: html))
 
-        // Replace potentially broken player ID with known working one, and fetch the main variant
+        // Replace potentially broken player ID with known working one, and fetch the tv variant
         // Format: /s/player/{PLAYER_ID}/{VARIANT_PATH}
         let playerIDPattern = NSRegularExpression(#"(/s/player/)([a-zA-Z0-9_]+)(/.*)"#)
         if let (_, groupMatches) = playerIDPattern.firstMatch(in: baseURL, includingGroups: [1, 2, 3]),
