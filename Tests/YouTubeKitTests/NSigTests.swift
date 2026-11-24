@@ -123,6 +123,16 @@ struct NSigTests {
     }
     
     
+    /// Player 05a4ffc0's main variant throws `a.addOnDisposeCallback is not a function` in the solver (https://github.com/yt-dlp/ejs/issues/79).
+    @Test("NSig for a player whose main variant can't be solved")
+    func nSigForPlayerWithUnsolvableMainVariant() async throws {
+        let html = #"ytcfg.set({"STS":20779});var ytInitialPlayerResponse = {};var ytplayer = {"config":{"assets":{"js":"/s/player/05a4ffc0/player_ias.vflset/en_US/base.js"}}};"#
+        let playerURL = try #require(URL(string: try Extraction.jsURL(html: html)))
+        let solver = try SignatureSolver(js: try await downloadJavascript(fromURL: playerURL))
+        let response = try solver.batchSolve(request: .init(nInputs: ["zyfc6LXJJ_Fc8A16e"], sigInputs: []))
+        #expect(response.nMap["zyfc6LXJJ_Fc8A16e"] == "E6D9M3x4irRUjQ")
+    }
+
     @Test("NSig over all players", arguments: [
         NSigPlayerRequest(playerURL: URL(string: "https://www.youtube.com/s/player/e06dea74/player_ias.vflset/en_US/base.js")!, input: "AiuodmaDDYw8d3y4bf", output: "ankd8eza2T6Qmw"),
         NSigPlayerRequest(playerURL: URL(string: "https://www.youtube.com/s/player/5dd88d1d/player-plasma-ias-phone-en_US.vflset/base.js")!, input: "kSxKFLeqzv_ZyHSAt", output: "n8gS8oRlHOxPFA"),
